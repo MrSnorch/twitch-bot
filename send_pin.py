@@ -1,5 +1,10 @@
 """
-Отправляет сообщение из message.txt в чат Twitch и закрепляет его.
+Отправляет сообщение(я) из message.txt в чат Twitch и закрепляет последнее.
+Чтобы отправить 2 (или больше) сообщения — разделите их в message.txt строкой '---' на отдельной строке.
+Пример:
+    Первое сообщение (будет закреплено)
+    ---
+    Второе сообщение
 Требует env: TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TWITCH_REFRESH_TOKEN
 Выводит новый refresh_token в stdout в формате NEW_REFRESH_TOKEN=... (для сохранения в secrets).
 """
@@ -41,7 +46,15 @@ def get_user_id(access_token):
     return resp.json()["data"][0]["id"]
 
 
-def send_and_pin_message(access_token, broadcaster_id, message):
+def send_message(access_token, broadcaster_id, message, pin=False):
+    payload = {
+        "broadcaster_id": broadcaster_id,
+        "sender_id": broadcaster_id,
+        "message": message,
+    }
+    if pin:
+        payload["pin"] = True
+
     resp = requests.post(
         "https://api.twitch.tv/helix/chat/messages",
         headers={
@@ -49,31 +62,42 @@ def send_and_pin_message(access_token, broadcaster_id, message):
             "Client-Id": CLIENT_ID,
             "Content-Type": "application/json",
         },
-        json={
-            "broadcaster_id": broadcaster_id,
-            "sender_id": broadcaster_id,
-            "message": message,
-            "pin": True,
-        },
+        json=payload,
     )
     resp.raise_for_status()
     return resp.json()
 
 
-def main():
+def load_messages():
+    """
+    Читает message.txt. Несколько сообщений разделяются строкой '---' на отдельной строке.
+    Если разделителя нет — считается, что сообщение одно (весь файл).
+    """
     with open(MESSAGE_FILE, "r", encoding="utf-8") as f:
-        message = f.read().strip()
+        content = f.read()
 
-    if not message:
+    parts = [p.strip() for p in content.split("\n---\n")]
+    # на случай разделителя в самом конце/начале файла без лишних пустых частей
+    messages = [p for p in parts if p]
+    return messages
+
+
+def main():
+    messages = load_messages()
+
+    if not messages:
         print("message.txt пуст, нечего отправлять", file=sys.stderr)
         sys.exit(1)
 
     access_token, new_refresh_token = refresh_access_token()
     broadcaster_id = get_user_id(access_token)
-    result = send_and_pin_message(access_token, broadcaster_id, message)
 
-    print(f"Отправлено и закреплено: {message!r}")
-    print(result)
+    for i, message in enumerate(messages):
+        is_first = i == 0
+        result = send_message(access_token, broadcaster_id, message, pin=is_first)
+        status = "закреплено" if is_first else "отправлено"
+        print(f"Сообщение {i + 1}/{len(messages)} {status}: {message!r}")
+        print(result)
 
     if new_refresh_token != REFRESH_TOKEN:
         print(f"NEW_REFRESH_TOKEN={new_refresh_token}")

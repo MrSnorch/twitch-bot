@@ -1,0 +1,41 @@
+name: Send and pin Twitch chat message
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # каждый час
+  workflow_dispatch: {}   # можно запускать вручную из вкладки Actions
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Send and pin message
+        id: run
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          TWITCH_REFRESH_TOKEN: ${{ secrets.TWITCH_REFRESH_TOKEN }}
+        run: |
+          python send_pin.py | tee output.log
+
+      - name: Rotate refresh token secret if changed
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          NEW_TOKEN=$(grep -oP '(?<=NEW_REFRESH_TOKEN=).*' output.log || true)
+          if [ -n "$NEW_TOKEN" ]; then
+            gh secret set TWITCH_REFRESH_TOKEN --repo "${{ github.repository }}" --body "$NEW_TOKEN"
+            echo "refresh token обновлён в secrets"
+          fi

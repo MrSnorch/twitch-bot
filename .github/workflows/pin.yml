@@ -2,7 +2,7 @@ name: Send and pin Twitch chat message
 
 on:
   schedule:
-    - cron: "0 * * * *"  # каждый час
+    - cron: "7 * * * *"  # каждый час, в :07 (меньше очередей, чем в :00)
   workflow_dispatch: {}   # можно запускать вручную из вкладки Actions
 
 jobs:

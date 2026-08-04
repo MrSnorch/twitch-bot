@@ -81,7 +81,7 @@ def send_message(access_token, broadcaster_id, message):
     return resp.json()
 
 
-def pin_message(access_token, broadcaster_id, message_id, duration_seconds=5400):
+def pin_message(access_token, broadcaster_id, message_id):
     resp = requests.put(
         "https://api.twitch.tv/helix/chat/pins",
         headers={
@@ -92,7 +92,6 @@ def pin_message(access_token, broadcaster_id, message_id, duration_seconds=5400)
             "broadcaster_id": broadcaster_id,
             "moderator_id": broadcaster_id,
             "message_id": message_id,
-            "duration_seconds": duration_seconds,
         },
     )
     resp.raise_for_status()

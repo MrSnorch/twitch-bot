@@ -46,14 +46,27 @@ def get_user_id(access_token):
     return resp.json()["data"][0]["id"]
 
 
-def send_message(access_token, broadcaster_id, message, pin=False):
+def clear_chat(access_token, broadcaster_id):
+    resp = requests.delete(
+        "https://api.twitch.tv/helix/moderation/chat",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Client-Id": CLIENT_ID,
+        },
+        params={
+            "broadcaster_id": broadcaster_id,
+            "moderator_id": broadcaster_id,
+        },
+    )
+    resp.raise_for_status()
+
+
+def send_message(access_token, broadcaster_id, message):
     payload = {
         "broadcaster_id": broadcaster_id,
         "sender_id": broadcaster_id,
         "message": message,
     }
-    if pin:
-        payload["pin"] = True
 
     resp = requests.post(
         "https://api.twitch.tv/helix/chat/messages",
@@ -66,6 +79,23 @@ def send_message(access_token, broadcaster_id, message, pin=False):
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def pin_message(access_token, broadcaster_id, message_id, duration_seconds=5400):
+    resp = requests.put(
+        "https://api.twitch.tv/helix/chat/pins",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Client-Id": CLIENT_ID,
+        },
+        params={
+            "broadcaster_id": broadcaster_id,
+            "moderator_id": broadcaster_id,
+            "message_id": message_id,
+            "duration_seconds": duration_seconds,
+        },
+    )
+    resp.raise_for_status()
 
 
 def load_messages():
@@ -92,12 +122,19 @@ def main():
     access_token, new_refresh_token = refresh_access_token()
     broadcaster_id = get_user_id(access_token)
 
+    clear_chat(access_token, broadcaster_id)
+    print("Чат очищен")
+
     for i, message in enumerate(messages):
         is_first = i == 0
-        result = send_message(access_token, broadcaster_id, message, pin=is_first)
-        status = "закреплено" if is_first else "отправлено"
-        print(f"Сообщение {i + 1}/{len(messages)} {status}: {message!r}")
+        result = send_message(access_token, broadcaster_id, message)
+        print(f"Сообщение {i + 1}/{len(messages)} отправлено: {message!r}")
         print(result)
+
+        if is_first:
+            message_id = result["data"][0]["message_id"]
+            pin_message(access_token, broadcaster_id, message_id)
+            print("Сообщение закреплено")
 
     if new_refresh_token != REFRESH_TOKEN:
         print(f"NEW_REFRESH_TOKEN={new_refresh_token}")

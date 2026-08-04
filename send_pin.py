@@ -127,14 +127,23 @@ def main():
 
     for i, message in enumerate(messages):
         is_first = i == 0
-        result = send_message(access_token, broadcaster_id, message)
+        try:
+            result = send_message(access_token, broadcaster_id, message)
+        except requests.HTTPError as e:
+            print(f"Сообщение {i + 1}/{len(messages)} НЕ отправлено: {message!r}", file=sys.stderr)
+            print(f"Ошибка Twitch: {e.response.status_code} {e.response.text}", file=sys.stderr)
+            continue
+
         print(f"Сообщение {i + 1}/{len(messages)} отправлено: {message!r}")
         print(result)
 
         if is_first:
             message_id = result["data"][0]["message_id"]
-            pin_message(access_token, broadcaster_id, message_id)
-            print("Сообщение закреплено")
+            try:
+                pin_message(access_token, broadcaster_id, message_id)
+                print("Сообщение закреплено")
+            except requests.HTTPError as e:
+                print(f"Не удалось закрепить: {e.response.status_code} {e.response.text}", file=sys.stderr)
 
     if new_refresh_token != REFRESH_TOKEN:
         print(f"NEW_REFRESH_TOKEN={new_refresh_token}")
